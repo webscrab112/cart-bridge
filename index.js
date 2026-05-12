@@ -14,7 +14,7 @@ app.post("/convert-cart", (req, res) => {
   const cart = req.body.cart || [];
 
   let parts = cart.map(item => {
-    return ${productMap[item.id]}:${item.qty};
+   return ${productMap[item.id]}:${item.qty};
   });
 
   const url =
