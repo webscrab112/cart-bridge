@@ -1,36 +1,42 @@
-<script>
+const express = require("express");
+const cors = require("cors");
 
-jQuery(document).on('click', '.checkout-button.wc-forward', function(e){
+const app = express();
 
-    e.preventDefault();
+app.use(cors());
+app.use(express.json());
 
-    alert("CLICK OK");
+// YOUR REAL PRODUCT MAPPING
+const productMap = {
+  6191: "53755196703057",
+  5786: "53755775385937",
+  6480: "53755808219473"
+};
 
-    fetch('https://cart-bridge-production.up.railway.app/convert-cart', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            cart: [
-                { id: 101, qty: 2 }
-            ]
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
+app.post("/convert-cart", (req, res) => {
 
-        alert("RESPONSE: " + JSON.stringify(data));
+  const cart = req.body.cart || [];
 
-        console.log(data);
+  let parts = cart.map(item => {
 
-    })
-    .catch(err => {
+    const shopifyId = productMap[item.id];
 
-        alert("ERROR: " + err);
+    if (!shopifyId) return null;
 
-    });
+    return `${shopifyId}:${item.qty}`;
+
+  }).filter(Boolean);
+
+  const url =
+    "https://qesbbu-2v.myshopify.com/cart/" +
+    parts.join(",");
+
+  res.json({ url });
 
 });
 
-</script>
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on", PORT);
+});
