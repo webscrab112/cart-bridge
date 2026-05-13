@@ -1,43 +1,36 @@
-const express = require("express");
-const app = express();
+<script>
 
-app.use(express.json());
+jQuery(document).on('click', '.checkout-button.wc-forward', function(e){
 
-// WooCommerce Product ID → Shopify Variant ID
-const productMap = {
-  6191: "53755196703057",
+    e.preventDefault();
 
-  5786: "53755775385937",
+    alert("CLICK OK");
 
-  6480: "53755808219473"
-};
+    fetch('https://cart-bridge-production.up.railway.app/convert-cart', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            cart: [
+                { id: 101, qty: 2 }
+            ]
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
 
-app.post("/convert-cart", (req, res) => {
+        alert("RESPONSE: " + JSON.stringify(data));
 
-  const cart = req.body.cart || [];
+        console.log(data);
 
-  let parts = cart.map(item => {
+    })
+    .catch(err => {
 
-    let shopifyId = productMap[item.id];
+        alert("ERROR: " + err);
 
-    if (!shopifyId) return null;
-
-    return ${shopifyId}:${item.qty};
-
-  }).filter(Boolean);
-
-  const checkoutURL =
-    "https://qesbbu-2v.myshopify.com/cart/" +
-    parts.join(",");
-
-  res.json({
-    url: checkoutURL
-  });
+    });
 
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on", PORT);
-});
+</script>
