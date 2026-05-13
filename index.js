@@ -6,7 +6,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// YOUR REAL PRODUCT MAPPING
+// ROOT ROUTE (VERY IMPORTANT)
+app.get("/", (req, res) => {
+  res.send("Cart bridge is running");
+});
+
+// YOUR MAPPING
 const productMap = {
   6191: "53755196703057",
   5786: "53755775385937",
@@ -17,7 +22,7 @@ app.post("/convert-cart", (req, res) => {
 
   const cart = req.body.cart || [];
 
-  let parts = cart.map(item => {
+  const parts = cart.map(item => {
 
     const shopifyId = productMap[item.id];
 
@@ -35,6 +40,7 @@ app.post("/convert-cart", (req, res) => {
 
 });
 
+// IMPORTANT PORT HANDLING
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
