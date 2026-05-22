@@ -9,13 +9,14 @@ app.use(express.json({ limit: "10kb" }));
 
 /* ══════════════════════════════════════════════════════════════
    PRODUCT MAP
-   Every WooCommerce product ID → its Shopify variant ID.
-   Multiple WooCommerce IDs can map to the same Shopify variant.
+   WooCommerce product ID → Shopify variant ID
+   Multiple WooCommerce IDs CAN share the same Shopify variant ID.
+   Quantities for same Shopify variant are automatically merged.
 
    TO ADD A NEW PRODUCT:
-   1. WooCommerce admin → Products → hover name → browser bar shows post=XXXX
-   2. Shopify admin → Products → click variant → URL shows /variants/XXXXXXXXXX
-   3. Add one line: WOOCOMMERCE_ID: "SHOPIFY_VARIANT_ID",
+   WooCommerce ID: go to wp-admin → Products → hover name → post=XXXX in URL
+   Shopify variant ID: Shopify admin → Products → variant → /variants/XXXX in URL
+   Then add: WOOCOMMERCE_ID: "SHOPIFY_VARIANT_ID",
 ══════════════════════════════════════════════════════════════ */
 const PRODUCT_MAP = {
   // Shopify variant 53755196703057
@@ -60,16 +61,10 @@ const PRODUCT_MAP = {
 
 const SHOPIFY_STORE = "https://qesbbu-2v.myshopify.com";
 
-/* ── Health check ─────────────────────────────────────────── */
 app.get("/", (_req, res) => {
   res.status(200).json({ status: "ok", message: "Cart bridge running" });
 });
 
-/* ══════════════════════════════════════════════════════════════
-   POST /convert-cart
-   Receives: { cart: [ { id: 6191, qty: 2 } ] }
-   Returns:  { url: "https://shopify.../cart/VARIANT:QTY,..." }
-══════════════════════════════════════════════════════════════ */
 app.post("/convert-cart", (req, res) => {
   try {
     console.log("INCOMING:", JSON.stringify(req.body));
@@ -83,10 +78,10 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    // Merge quantities per Shopify variant
-    // (multiple WooCommerce products can map to same Shopify variant)
-    const variantQty = {};
-    const skipped    = [];
+    // Merge quantities per Shopify variant ID
+    // Handles: multiple WooCommerce products → same Shopify variant
+    const variantTotals = {};
+    const skipped       = [];
 
     for (const item of cart) {
       const id  = Number(item.id);
@@ -103,15 +98,19 @@ app.post("/convert-cart", (req, res) => {
         continue;
       }
 
-      variantQty[variantId] = (variantQty[variantId] || 0) + qty;
+      // KEY FIX: accumulate qty per Shopify variant
+      // So if WooCommerce IDs 6419 + 6191 both map to same Shopify variant,
+      // their quantities are added together correctly
+      variantTotals[variantId] = (variantTotals[variantId] || 0) + qty;
     }
 
-    const parts = Object.keys(variantQty).map(v => `${v}:${variantQty[v]}`);
+    const parts = Object.keys(variantTotals)
+      .map(function (v) { return v + ":" + variantTotals[v]; });
 
     if (parts.length === 0) {
       return res.status(400).json({
-        error: "No products matched. Check WooCommerce IDs vs PRODUCT_MAP.",
-        received: cart.map(i => i.id),
+        error: "No products matched PRODUCT_MAP.",
+        received_ids: cart.map(i => i.id),
         map_has: Object.keys(PRODUCT_MAP).map(Number),
         skipped
       });
@@ -133,5 +132,5 @@ app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Cart bridge on port ${PORT}`);
-  console.log(`Map has ${Object.keys(PRODUCT_MAP).length} WooCommerce IDs`);
+  console.log(`Map: ${Object.keys(PRODUCT_MAP).length} WooCommerce IDs → Shopify`);
 });
