@@ -58,6 +58,7 @@ const PRODUCT_MAP = {
   // Shopify variant 53835901927761
   6849: "53835901927761",
   6306: "53835901927761",
+  7534: "53835901927761",
 };
 
 const SHOPIFY_STORE = "https://qesbbu-2v.myshopify.com";
