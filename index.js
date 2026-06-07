@@ -62,7 +62,7 @@ const PRODUCT_MAP = {
   7534: "53835901927761",
 };
 
-const SHOPIFY_STORE = "https://qesbbu-2v.myshopify.com";
+const SHOPIFY_STORE = "https://returntovault.site";
 
 app.get("/", (_req, res) => {
   res.status(200).json({ status: "ok", message: "Cart bridge running" });
