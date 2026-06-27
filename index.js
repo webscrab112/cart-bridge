@@ -10,63 +10,55 @@ app.use(express.json({ limit: "10kb" }));
 /* ══════════════════════════════════════════════════════════════
    PRODUCT MAP
    WooCommerce product ID → Shopify variant ID
-   Multiple WooCommerce IDs CAN share the same Shopify variant ID.
-   Quantities for same Shopify variant are automatically merged.
+
+   Each Shopify product was created 1-to-1 with its WooCommerce
+   counterpart, so every entry below is unique on both sides.
+   No merge logic is needed — one WooCommerce ID always means
+   exactly one Shopify variant, and vice versa.
 
    TO ADD A NEW PRODUCT:
-   WooCommerce ID: go to wp-admin → Products → hover name → post=XXXX in URL
-   Shopify variant ID: Shopify admin → Products → variant → /variants/XXXX in URL
-   Then add: WOOCOMMERCE_ID: "SHOPIFY_VARIANT_ID",
+   1. Create a matching product in Shopify (1-to-1, don't reuse
+      an existing Shopify product/variant for a different
+      WooCommerce product — this is what caused order mix-ups
+      in the old multi-ID system).
+   2. WooCommerce ID: wp-admin → Products → hover name → post=XXXX
+   3. Shopify variant ID: Shopify admin → Products → variant →
+      /variants/XXXX in the URL
+   4. Add a line below: WOOCOMMERCE_ID: "SHOPIFY_VARIANT_ID",
 ══════════════════════════════════════════════════════════════ */
 const PRODUCT_MAP = {
-  // Shopify variant 53755196703057
   6419: "53755196703057",
-  6191: "53755196703057",
-  6140: "53755196703057",
-
-  // Shopify variant 53755775385937
+  6140: "54150524666193",
+  6191: "54150526435665",
   5786: "53755775385937",
-  6697: "53755775385937",
-  6482: "53755775385937",
-  6362: "53755775385937",
-
-  // Shopify variant 53835905565009
+  6697: "54150527582545",
+  6482: "54150527910225",
+  6362: "54150541836625",
   6308: "53835905565009",
-  6396: "53835905565009",
-
-  // Shopify variant 53755808219473
   6480: "53755808219473",
-  7914: "53755808219473",
-
-  // Shopify variant 53835877548369
   6719: "53835877548369",
-  6500: "53835877548369",
-
-  // Shopify variant 53835896586577
+  6500: "54150533579089",
   6314: "53835896586577",
-  6347: "53835896586577",
-  6819: "53835896586577",
-
-  // Shopify variant 53835898093905
+  6819: "54150533710161",
+  6347: "54150540001617",
   6766: "53835898093905",
-  7584: "53835898093905",
-
-  // Shopify variant 53835869782353
   6227: "53835869782353",
-
-  // Shopify variant 53835903435089
   6302: "53835903435089",
-
-  // Shopify variant 53835901927761
   6849: "53835901927761",
-  6306: "53835901927761",
-  7534: "53835901927761",
+  6306: "54150542131537",
+  7584: "10902157492561",
+  7914: "54150542197073",
+  7534: "54150532727121",
+  6605: "54150533316945",
+  6396: "54150532530513",
+  7556: "54150674776401",
+  6813: "54150674973009",
 };
 
-const SHOPIFY_STORE = "https://returntovault.site";
+const SHOPIFY_STORE = "https://qesbbu-2v.myshopify.com";
 
 app.get("/", (_req, res) => {
-  res.status(200).json({ status: "ok", message: "Cart bridge running" });
+  res.status(200).json({ status: "ok", message: "Cart bridge running", products: Object.keys(PRODUCT_MAP).length });
 });
 
 app.post("/convert-cart", (req, res) => {
@@ -82,8 +74,10 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    // Merge quantities per Shopify variant ID
-    // Handles: multiple WooCommerce products → same Shopify variant
+    // Each WooCommerce ID maps to a UNIQUE Shopify variant now, so
+    // we still accumulate by variant defensively (in case the same
+    // product is somehow represented twice in one cart payload),
+    // but in practice each line stays 1-to-1.
     const variantTotals = {};
     const skipped       = [];
 
@@ -102,9 +96,6 @@ app.post("/convert-cart", (req, res) => {
         continue;
       }
 
-      // KEY FIX: accumulate qty per Shopify variant
-      // So if WooCommerce IDs 6419 + 6191 both map to same Shopify variant,
-      // their quantities are added together correctly
       variantTotals[variantId] = (variantTotals[variantId] || 0) + qty;
     }
 
@@ -136,5 +127,5 @@ app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Cart bridge on port ${PORT}`);
-  console.log(`Map: ${Object.keys(PRODUCT_MAP).length} WooCommerce IDs → Shopify`);
+  console.log(`Map: ${Object.keys(PRODUCT_MAP).length} WooCommerce IDs → Shopify (1-to-1)`);
 });
