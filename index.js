@@ -112,16 +112,21 @@ app.post("/convert-cart", (req, res) => {
     }
 
     /* ══════════════════════════════════════════════════════════════
-       IMPORTANT: Shopify's /cart/VARIANT:QTY permalink ADDS to
-       whatever is already in that customer's Shopify cart — it
-       does NOT replace it. Confirmed real-world bug: a returning
-       customer who already had items from a previous visit would
-       see old + new items stacked together.
+       NOTE on a known limitation: Shopify's /cart/VARIANT:QTY
+       permalink ADDS to whatever is already in that customer's
+       Shopify cart — it never replaces it (confirmed in Shopify's
+       own documentation). We clear the cart first via /cart/clear
+       before adding, which handles this correctly in the large
+       majority of cases.
 
-       Fix: clear the Shopify cart first via /cart/clear, then
-       chain straight into the add via return_to, landing the
-       customer on a cart that ONLY contains what's actually in
-       their WooCommerce cart right now.
+       Shopify's own developer community has also reported a rare
+       race condition where a clear immediately followed by an add
+       can occasionally leave old items in the cart alongside the
+       new ones — this is a timing issue on Shopify's side, not
+       something controllable purely through redirect URLs. A fully
+       guaranteed fix would require creating checkouts server-side
+       via Shopify's Storefront API instead of customer-cart
+       permalinks; for now we're accepting this known edge case.
     ══════════════════════════════════════════════════════════════ */
     const addPath = `/cart/${parts.join(",")}`;
     const url = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
