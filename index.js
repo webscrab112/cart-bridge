@@ -55,7 +55,7 @@ const PRODUCT_MAP = {
   6813: "54150674973009",
 };
 
-const SHOPIFY_STORE = "https://qesbbu-2v.myshopify.com";
+const SHOPIFY_STORE = "https://returntovault.site";
 
 app.get("/", (_req, res) => {
   res.status(200).json({ status: "ok", message: "Cart bridge running", products: Object.keys(PRODUCT_MAP).length });
