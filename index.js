@@ -111,7 +111,20 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    const url = `${SHOPIFY_STORE}/cart/${parts.join(",")}`;
+    /* ══════════════════════════════════════════════════════════════
+       IMPORTANT: Shopify's /cart/VARIANT:QTY permalink ADDS to
+       whatever is already in that customer's Shopify cart — it
+       does NOT replace it. Confirmed real-world bug: a returning
+       customer who already had items from a previous visit would
+       see old + new items stacked together.
+
+       Fix: clear the Shopify cart first via /cart/clear, then
+       chain straight into the add via return_to, landing the
+       customer on a cart that ONLY contains what's actually in
+       their WooCommerce cart right now.
+    ══════════════════════════════════════════════════════════════ */
+    const addPath = `/cart/${parts.join(",")}`;
+    const url = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
     console.log("✅ URL:", url);
 
     return res.status(200).json({ url, skipped });
