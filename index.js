@@ -7,25 +7,6 @@ const app     = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "10kb" }));
 
-/* ══════════════════════════════════════════════════════════════
-   PRODUCT MAP
-   WooCommerce product ID → Shopify variant ID
-
-   Each Shopify product was created 1-to-1 with its WooCommerce
-   counterpart, so every entry below is unique on both sides.
-   No merge logic is needed — one WooCommerce ID always means
-   exactly one Shopify variant, and vice versa.
-
-   TO ADD A NEW PRODUCT:
-   1. Create a matching product in Shopify (1-to-1, don't reuse
-      an existing Shopify product/variant for a different
-      WooCommerce product — this is what caused order mix-ups
-      in the old multi-ID system).
-   2. WooCommerce ID: wp-admin → Products → hover name → post=XXXX
-   3. Shopify variant ID: Shopify admin → Products → variant →
-      /variants/XXXX in the URL
-   4. Add a line below: WOOCOMMERCE_ID: "SHOPIFY_VARIANT_ID",
-══════════════════════════════════════════════════════════════ */
 const PRODUCT_MAP = {
   6419: "53755196703057",
   6140: "54150524666193",
@@ -67,7 +48,11 @@ const PRODUCT_MAP = {
 const SHOPIFY_STORE = "https://returntovault.site";
 
 app.get("/", (_req, res) => {
-  res.status(200).json({ status: "ok", message: "Cart bridge running", products: Object.keys(PRODUCT_MAP).length });
+  res.status(200).json({ 
+    status: "ok", 
+    message: "Cart bridge running", 
+    products: Object.keys(PRODUCT_MAP).length 
+  });
 });
 
 app.post("/convert-cart", (req, res) => {
@@ -83,19 +68,21 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    // Each WooCommerce ID maps to a UNIQUE Shopify variant now, so
-    // we still accumulate by variant defensively (in case the same
-    // product is somehow represented twice in one cart payload),
-    // but in practice each line stays 1-to-1.
     const variantTotals = {};
-    const skipped       = [];
+    const skipped = [];
 
     for (const item of cart) {
       const id  = Number(item.id);
       const qty = Math.floor(Number(item.qty));
 
-      if (!id  || id  <= 0) { skipped.push({ ...item, reason: "invalid id"  }); continue; }
-      if (!qty || qty <= 0) { skipped.push({ ...item, reason: "invalid qty" }); continue; }
+      if (!id || id <= 0) { 
+        skipped.push({ ...item, reason: "invalid id" }); 
+        continue; 
+      }
+      if (!qty || qty <= 0) { 
+        skipped.push({ ...item, reason: "invalid qty" }); 
+        continue; 
+      }
 
       const variantId = PRODUCT_MAP[id];
       console.log(`id=${id} qty=${qty} → ${variantId || "NOT IN MAP"}`);
@@ -120,25 +107,9 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       NOTE on a known limitation: Shopify's /cart/VARIANT:QTY
-       permalink ADDS to whatever is already in that customer's
-       Shopify cart — it never replaces it (confirmed in Shopify's
-       own documentation). We clear the cart first via /cart/clear
-       before adding, which handles this correctly in the large
-       majority of cases.
-
-       Shopify's own developer community has also reported a rare
-       race condition where a clear immediately followed by an add
-       can occasionally leave old items in the cart alongside the
-       new ones — this is a timing issue on Shopify's side, not
-       something controllable purely through redirect URLs. A fully
-       guaranteed fix would require creating checkouts server-side
-       via Shopify's Storefront API instead of customer-cart
-       permalinks; for now we're accepting this known edge case.
-    ══════════════════════════════════════════════════════════════ */
     const addPath = `/cart/${parts.join(",")}`;
     const url = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
+
     console.log("✅ URL:", url);
 
     return res.status(200).json({ url, skipped });
