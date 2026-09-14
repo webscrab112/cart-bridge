@@ -9,9 +9,9 @@ app.use(express.json({ limit: "10kb" }));
 
 const PRODUCT_MAP = {
   6419: "53755196703057",
-  6140: "54150524666193",
-  6191: "54150526435665",
-  5786: "53755775385937",
+  6140: "53755196703057",
+  6191: "53755196703057",
+  5786: "53755196703057",
   6697: "54150527582545",
   6482: "54150527910225",
   6362: "54150541836625",
@@ -45,7 +45,7 @@ const PRODUCT_MAP = {
   8563: "53835901927761",
 };
 
-const SHOPIFY_STORE = "https://returntovault.site";
+const SHOPIFY_STORE = "https://backtovault.shop";
 
 app.get("/", (_req, res) => {
   res.status(200).json({ 
