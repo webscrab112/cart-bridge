@@ -41,6 +41,7 @@ const PRODUCT_MAP = {
   8563: "54970048020821",
   3904: "54970048020821",
   6354: "54971336622421"
+  3354: "54970048020821",
 };
 
 const SHOPIFY_STORE = "https://backtovault.shop";
