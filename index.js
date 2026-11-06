@@ -4,10 +4,11 @@ const express = require("express");
 const cors    = require("cors");
 const app     = express();
 
-app.use(cors({ origin: "*" }));
+app.set("trust proxy", 1);
+app.use(cors({ origin: ["https://returntovault.shop", "https://www.returntovault.shop"] }));
 app.use(express.json({ limit: "10kb" }));
 
-const PRODUCT_MAP = {
+const PRODUCT_MAP = Object.freeze({
   6314: "58155992547708",
   8563: "58155987337596",
   8436: "58155989565820",
@@ -40,22 +41,24 @@ const PRODUCT_MAP = {
   8764: "58155985469820",
   6538: "58155989664124",
   7013: "58155992777084"
-};
+});
+
+const VARIANT_ID_RE = /^\d{10,20}$/;
+const MAX_QTY_PER_LINE = 99;
+const MAX_LINES = 50;
 
 const SHOPIFY_STORE = "https://returntovault.shop";
 
 app.get("/", (_req, res) => {
-  res.status(200).json({ 
-    status: "ok", 
-    message: "Cart bridge running", 
-    products: Object.keys(PRODUCT_MAP).length 
+  res.status(200).json({
+    status: "ok",
+    message: "Cart bridge running",
+    products: Object.keys(PRODUCT_MAP).length
   });
 });
 
 app.post("/convert-cart", (req, res) => {
   try {
-    console.log("INCOMING:", JSON.stringify(req.body));
-
     const { cart } = req.body || {};
 
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -65,27 +68,39 @@ app.post("/convert-cart", (req, res) => {
       });
     }
 
-    const variantTotals = {};
+    if (cart.length > MAX_LINES) {
+      return res.status(400).json({ error: `Too many cart lines (max ${MAX_LINES}).` });
+    }
+
+    const variantTotals = Object.create(null);
     const skipped = [];
 
     for (const item of cart) {
-      const id  = Number(item.id);
-      const qty = Math.floor(Number(item.qty));
+      const id  = Number(item?.id);
+      const qty = Math.floor(Number(item?.qty));
 
-      if (!id || id <= 0) { 
-        skipped.push({ ...item, reason: "invalid id" }); 
-        continue; 
+      if (!Number.isInteger(id) || id <= 0) {
+        skipped.push({ id: item?.id, qty: item?.qty, reason: "invalid id" });
+        continue;
       }
-      if (!qty || qty <= 0) { 
-        skipped.push({ ...item, reason: "invalid qty" }); 
-        continue; 
+      if (!Number.isInteger(qty) || qty <= 0) {
+        skipped.push({ id, qty: item?.qty, reason: "invalid qty" });
+        continue;
+      }
+      if (qty > MAX_QTY_PER_LINE) {
+        skipped.push({ id, qty, reason: `qty exceeds max ${MAX_QTY_PER_LINE}` });
+        continue;
       }
 
       const variantId = PRODUCT_MAP[id];
-      console.log(`id=${id} qty=${qty} → ${variantId || "NOT IN MAP"}`);
 
       if (!variantId) {
         skipped.push({ id, qty, reason: `WooCommerce ID ${id} not in PRODUCT_MAP` });
+        continue;
+      }
+
+      if (!VARIANT_ID_RE.test(variantId)) {
+        skipped.push({ id, qty, reason: `Variant ID for ${id} is malformed` });
         continue;
       }
 
@@ -93,21 +108,18 @@ app.post("/convert-cart", (req, res) => {
     }
 
     const parts = Object.keys(variantTotals)
-      .map(function (v) { return v + ":" + variantTotals[v]; });
+      .map((v) => `${v}:${variantTotals[v]}`);
 
     if (parts.length === 0) {
       return res.status(400).json({
         error: "No products matched PRODUCT_MAP.",
-        received_ids: cart.map(i => i.id),
-        map_has: Object.keys(PRODUCT_MAP).map(Number),
+        received_ids: cart.map((i) => i?.id),
         skipped
       });
     }
 
     const addPath = `/cart/${parts.join(",")}`;
     const url = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
-
-    console.log("✅ URL:", url);
 
     return res.status(200).json({ url, skipped });
 
