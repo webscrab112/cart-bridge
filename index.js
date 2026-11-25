@@ -52,7 +52,7 @@ const PRODUCT_MAP = {
   9760: "55568973955410"
 };
 
-const SHOPIFY_STORE = "https://gfpjzw-nr.myshopify.com";
+const SHOPIFY_STORE = "https://backtovaultbuy.shop";
 
 app.get("/", (_req, res) => {
   res.status(200).json({ 
