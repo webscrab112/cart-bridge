@@ -54,6 +54,65 @@ const PRODUCT_MAP = {
 
 const SHOPIFY_STORE = "https://backtovaultbuy.shop";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// UTM attribution (optional + additive).
+// The frontend MAY send the five UTM values in the /convert-cart JSON body,
+// either as top-level keys or inside a `utm` object:
+//   { cart: [...], utm: { utm_source: "...", ... } }
+//   { cart: [...], utm_source: "...", utm_medium: "...", ... }
+// Valid values are appended to the generated URL. Nothing is guessed, invented
+// or detected from headers; invalid/empty values are silently ignored and can
+// never make the cart conversion fail.
+// ─────────────────────────────────────────────────────────────────────────────
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+const UTM_MAX_LEN = 256;
+
+function cleanUtmValue(v) {
+  if (typeof v === "number" && Number.isFinite(v)) v = String(v);
+  if (typeof v !== "string") return null;
+  const s = v.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  if (!s || s.length > UTM_MAX_LEN) return null;
+  // Classic frontend bug: a missing value stringified as "undefined"/"null".
+  if (s.toLowerCase() === "undefined" || s.toLowerCase() === "null") return null;
+  // Malformed text (e.g. lone surrogate) would make encodeURIComponent throw.
+  try { encodeURIComponent(s); } catch (_e) { return null; }
+  return s;
+}
+
+// Returns { utm_source?: string, ... } with at most one valid value per key.
+// Precedence: the nested `utm` object first, then top-level keys; the first
+// valid value for a key wins and is never overwritten by a later one.
+function extractUtm(body) {
+  const out = {};
+  if (!body || typeof body !== "object") return out;
+
+  const sources = [];
+  if (body.utm && typeof body.utm === "object" && !Array.isArray(body.utm)) {
+    sources.push(body.utm);
+  }
+  sources.push(body);
+
+  for (const src of sources) {
+    for (const rawKey of Object.keys(src)) {
+      const key = rawKey.trim().toLowerCase();
+      if (!UTM_KEYS.includes(key)) continue;
+      if (Object.prototype.hasOwnProperty.call(out, key)) continue;
+      const val = cleanUtmValue(src[rawKey]);
+      if (val !== null) out[key] = val;
+    }
+  }
+  return out;
+}
+
+// Appends the UTMs after the existing query string, in a fixed order, once each.
+function appendUtm(url, utm) {
+  const pairs = UTM_KEYS
+    .filter(function (k) { return Object.prototype.hasOwnProperty.call(utm, k); })
+    .map(function (k) { return k + "=" + encodeURIComponent(utm[k]); });
+  if (pairs.length === 0) return url;
+  return url + (url.indexOf("?") === -1 ? "?" : "&") + pairs.join("&");
+}
+
 app.get("/", (_req, res) => {
   res.status(200).json({ 
     status: "ok", 
@@ -115,8 +174,11 @@ app.post("/convert-cart", (req, res) => {
     }
 
     const addPath = `/cart/${parts.join(",")}`;
-    const url = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
+    const baseUrl = `${SHOPIFY_STORE}/cart/clear?return_to=${encodeURIComponent(addPath)}`;
+    const utm = extractUtm(req.body);
+    const url = appendUtm(baseUrl, utm);
 
+    if (Object.keys(utm).length > 0) console.log("UTM:", JSON.stringify(utm));
     console.log("✅ URL:", url);
 
     return res.status(200).json({ url, skipped });
